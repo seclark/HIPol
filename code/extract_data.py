@@ -96,7 +96,9 @@ def plot_thumbnails():
     allpangs = get_data_from_name(alldata, 'pang')
     allpangs = [np.float(pang) for pang in allpangs]
     allnames = get_data_from_name(alldata, 'name')
-
+    allppwr = get_data_from_name(alldata, 'ppwr')
+    allppwr = [np.float(ppwr) for ppwr in allppwr]
+    
     allintrht_fn = "/Volumes/DataDavy/GALFA/DR2/FullSkyRHT/new_thetarht_maps/intrht_coadd_974_1069.fits"
     intrht = fits.getdata(allintrht_fn)
     
@@ -139,5 +141,5 @@ def plot_thumbnails():
         #print(labels)
         #ax.set_xticklabels(labels)
         
-        ax.quiver(datar, datar, np.cos(np.radians(allpangs[i])), np.sin(np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")
+        ax.quiver(datar, datar, np.cos(np.radians(allpangs[i])), np.sin(np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")#, scale=(np.max(allppwr)-allppwr[i]))
 
