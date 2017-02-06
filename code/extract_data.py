@@ -6,9 +6,14 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from astropy.io import fits
+from astropy import units as u
+from astropy.coordinates import SkyCoord
+from astropy.coordinates import FK5
 import copy
 import sys
 from astropy import wcs
+import matplotlib
+matplotlib.rcParams.update({'figure.autolayout': True})
 sys.path.insert(0, '../../PolarizationTools')
 import basic_functions as polarization_tools
 
@@ -81,6 +86,7 @@ def plot_thumbnails():
 
     nhidata_fn = "/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits"
     galfa_hdr = fits.getheader(nhidata_fn)
+    nhidata = fits.getdata(nhidata_fn)
 
     alldata = get_alldata()
     allras = get_data_from_name(alldata, 'ra')
@@ -96,12 +102,19 @@ def plot_thumbnails():
     
     nrows = 5
     ncols = 4
-    fig = plt.figure(facecolor="white")
+    fig = plt.figure(figsize=(12, 10), facecolor="white")
     datar = 200
     
     for i, (ra, dec) in enumerate(zip(allras, alldecs)):
         # get x, y points from ra dec
         w = make_wcs(nhidata_fn)
+        
+        # convert ra, dec to J2000
+        c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, equinox='J1950.0')
+        c1 = c.transform_to(FK5(equinox='J2000.0'))
+        ra = c1.ra.value
+        dec = c1.dec.value
+        
         x_center, y_center = radec_to_xy(ra, dec, w)
         
         x0 = x_center - datar
@@ -113,8 +126,10 @@ def plot_thumbnails():
         raend, decend = xy_to_radec(x1, y1, w)
         
         ax = fig.add_subplot(nrows, ncols, i+1)
-        ax.imshow(intrht[y0:y1, x0:x1], cmap='Greys')#, extent=[rastart, raend, decstart, decend])
+        #ax.imshow(intrht[y0:y1, x0:x1], cmap='Greys')#, extent=[rastart, raend, decstart, decend])
+        ax.imshow(nhidata[y0:y1, x0:x1], cmap='Greys')
         ax.set_title(allnames[i])
+        ax.set_ylim(0, y1-y0)
         
         ax.set_xticks([])
         ax.set_yticks([])
@@ -124,6 +139,5 @@ def plot_thumbnails():
         #print(labels)
         #ax.set_xticklabels(labels)
         
-        ax.quiver(datar, datar, np.cos(2*np.radians(allpangs[i])), np.sin(2*np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")
+        ax.quiver(datar, datar, np.cos(np.radians(allpangs[i])), np.sin(np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")
 
-    plt.tight_layout()
