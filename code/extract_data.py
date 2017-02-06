@@ -88,6 +88,7 @@ def plot_thumbnails():
     alldecs = get_data_from_name(alldata, 'dec')
     alldecs = [np.float(dec) for dec in alldecs]
     allpangs = get_data_from_name(alldata, 'pang')
+    allpangs = [np.float(pang) for pang in allpangs]
     allnames = get_data_from_name(alldata, 'name')
 
     allintrht_fn = "/Volumes/DataDavy/GALFA/DR2/FullSkyRHT/new_thetarht_maps/intrht_coadd_974_1069.fits"
@@ -96,14 +97,33 @@ def plot_thumbnails():
     nrows = 5
     ncols = 4
     fig = plt.figure(facecolor="white")
-    datar = 100
+    datar = 200
     
     for i, (ra, dec) in enumerate(zip(allras, alldecs)):
         # get x, y points from ra dec
         w = make_wcs(nhidata_fn)
         x_center, y_center = radec_to_xy(ra, dec, w)
         
+        x0 = x_center - datar
+        y0 = y_center - datar
+        x1 = x_center + datar
+        y1 = y_center + datar
+        
+        rastart, decstart = xy_to_radec(x0, y0, w)
+        raend, decend = xy_to_radec(x1, y1, w)
+        
         ax = fig.add_subplot(nrows, ncols, i+1)
-        ax.imshow(intrht[y_center-datar:y_center+datar, x_center-datar:x_center+datar])
+        ax.imshow(intrht[y0:y1, x0:x1], cmap='Greys')#, extent=[rastart, raend, decstart, decend])
+        ax.set_title(allnames[i])
+        
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlabel('ra '+str(ra))
+        ax.set_ylabel('dec '+str(dec))
+        #labels=ax.get_xticks().tolist()
+        #print(labels)
+        #ax.set_xticklabels(labels)
+        
+        ax.quiver(datar, datar, np.cos(2*np.radians(allpangs[i])), np.sin(2*np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")
 
-
+    plt.tight_layout()
