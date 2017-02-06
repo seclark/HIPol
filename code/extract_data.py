@@ -8,6 +8,7 @@ import matplotlib.gridspec as gridspec
 from astropy.io import fits
 import copy
 import sys
+from astropy import wcs
 sys.path.insert(0, '../../PolarizationTools')
 import basic_functions as polarization_tools
 
@@ -83,10 +84,11 @@ def plot_thumbnails():
 
     alldata = get_alldata()
     allras = get_data_from_name(alldata, 'ra')
+    allras = [np.float(ra) for ra in allras]
     alldecs = get_data_from_name(alldata, 'dec')
+    alldecs = [np.float(dec) for dec in alldecs]
     allpangs = get_data_from_name(alldata, 'pang')
     allnames = get_data_from_name(alldata, 'name')
-    print(allnames)
 
     allintrht_fn = "/Volumes/DataDavy/GALFA/DR2/FullSkyRHT/new_thetarht_maps/intrht_coadd_974_1069.fits"
     intrht = fits.getdata(allintrht_fn)
