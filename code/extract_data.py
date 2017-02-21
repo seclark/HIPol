@@ -5,7 +5,7 @@ from numpy.linalg import lapack_lite
 import time
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from astropy.io import fits
+from astropy.io import fits, ascii
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import FK5
@@ -16,6 +16,7 @@ import matplotlib
 matplotlib.rcParams.update({'figure.autolayout': True})
 sys.path.insert(0, '../../PolarizationTools')
 import basic_functions as polarization_tools
+
 
 def get_alldata():
     """
@@ -143,3 +144,80 @@ def plot_thumbnails():
         
         ax.quiver(datar, datar, np.cos(np.radians(allpangs[i])), np.sin(np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")#, scale=(np.max(allppwr)-allppwr[i]))
 
+def get_Planck_data(fn = None, Nside = 2048):
+    """
+    Get TQU and covariance matrix data.
+    Currently in Galactic coordinates.
+    """
+    if fn is None:
+        full_planck_fn = "/Volumes/DataDavy/Planck/HFI_SkyMap_353_"+str(Nside)+"_R2.02_full.fits"
+    else:
+        full_planck_fn = fn
+        
+    # resolution
+    Npix = 12*Nside**2
+
+    # input Planck 353 GHz maps (Galactic)
+    # full-mission -- N.B. these maps are already in RING ordering, despite what the header says
+    map353Gal = np.zeros((3,Npix)) #T,Q,U
+    cov353Gal = np.zeros((3,3,Npix)) #TT,TQ,TU,QQ,QU,UU
+    map353Gal[0], map353Gal[1], map353Gal[2], cov353Gal[0,0], cov353Gal[0,1], cov353Gal[0,2], cov353Gal[1,1], cov353Gal[1,2], cov353Gal[2,2], header353Gal = hp.fitsfunc.read_map(full_planck_fn, field=(0,1,2,4,5,6,7,8,9), h=True)
+
+    return map353Gal, cov353Gal
+
+def extract_planck_data():
+    alldata = get_alldata()
+    allells = get_data_from_name(alldata, 'ell')
+    allells = [np.float(ell) for ell in allells]
+    allbees = get_data_from_name(alldata, 'bee')
+    allbees = [np.float(bee) for bee in allbees]
+    allpangs = get_data_from_name(alldata, 'pang')
+    allpangs = [np.float(pang) for pang in allpangs]
+    allnames = get_data_from_name(alldata, 'name')
+    allppwr = get_data_from_name(alldata, 'ppwr')
+    allppwr = [np.float(ppwr) for ppwr in allppwr]
+    
+    nside = 2048
+    hpindxs = np.zeros(len(allells))
+    allpQs = np.zeros(len(allells))
+    allpUs = np.zeros(len(allells))
+    allpQeqs = np.zeros(len(allells))
+    allpUeqs = np.zeros(len(allells))
+    allpangs = np.zeros(len(allells))
+    allpQQs = np.zeros(len(allells))
+    allpUUs = np.zeros(len(allells))
+     
+    map353Gal, cov353Gal = get_Planck_data()
+        
+    planckQ = hp.fitsfunc.read_map("/Volumes/DataDavy/Planck/HFI_SkyMap_353_2048_R2.00_full.fits", field=1)
+    planckU = hp.fitsfunc.read_map("/Volumes/DataDavy/Planck/HFI_SkyMap_353_2048_R2.00_full.fits", field=2)
+    planckQQ = hp.fitsfunc.read_map("/Volumes/DataDavy/Planck/HFI_SkyMap_353_2048_R2.00_full.fits", field=7)
+    planckUU = hp.fitsfunc.read_map("/Volumes/DataDavy/Planck/HFI_SkyMap_353_2048_R2.00_full.fits", field=9)
+    
+    planckQeq = hp.fitsfunc.read_map("/Volumes/DataDavy/Planck/HFI_SkyMap_353_2048_R2.00_full_Equ.fits", field=1)
+    planckUeq = hp.fitsfunc.read_map("/Volumes/DataDavy/Planck/HFI_SkyMap_353_2048_R2.00_full_Equ.fits", field=2)
+    planckpang = np.mod(0.5*np.arctan2(planckU, planckQ), np.pi)
+    
+    for i, (l_, b_) in enumerate(zip(allells, allbees)):
+        indx = hp.pixelfunc.ang2pix(nside, l_, b_, lonlat = True)
+        hpindxs[i] = np.int(indx)
+        allpQs[i] = planckQ[indx]
+        allpUs[i] = planckU[indx]
+        allpQeqs[i] = planckQeq[indx]
+        allpUeqs[i] = planckUeq[indx]
+        allpQQs[i] = planckQQ[indx]
+        allpUUs[i] = planckUU[indx]
+        allpangs[i] = planckpang[indx]
+
+    return hpindxs, allpQs, allpUs, allpQeqs, allpUeqs, allpQQs, allpUUs, allpangs
+    
+def write_to_txt(hpindxs, allpQs, allpUs, allpQQs, allpUUs, allpangs):
+    
+    #hpindxs, allpQs, allpUs, allpQeqs, allpUeqs, allpQQs, allpUUs, allpangs = extract_planck_data()
+    
+    psi_IAU = np.mod(0.5*np.arctan2(-allpUs, allpQs ), np.pi)
+    
+    table = {'hpindx': hpindxs, 'psi_IAU': psi_IAU, 'galQ_IAU': allpQs, 'galU_IAU': -allpUs, 'galQQ': allpQQs, 'galUU': allpUUs}
+
+    ascii.write(table, '../data/planck353_IAU.dat', formats={'hpindx': '%d'})
+    
