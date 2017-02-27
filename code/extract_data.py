@@ -225,9 +225,31 @@ def get_halpha_data():
     halpha = hp.fitsfunc.read_map("../data/lambda_halpha_fwhm06_0512.fits")
     
     return halpha
+    
+def get_galfa_interpolation_values():
+    Gfile = '/Volumes/DataDavy/GALFA/DR2/FullSkyWide/GALFA_HI_W_S0900_V-090.9kms.fits'
+    ghdu = fits.open(Gfile)
+    gwcs = wcs.WCS(Gfile)
+    xax = np.linspace(1,ghdu[0].header['NAXIS1'], ghdu[0].header['NAXIS1'] ).reshape(ghdu[0].header['NAXIS1'], 1)
+    yax = np.linspace(1,ghdu[0].header['NAXIS2'], ghdu[0].header['NAXIS2'] ).reshape(1,ghdu[0].header['NAXIS2'])
+    test = gwcs.all_pix2world(xax, yax, 1)
+    RA = test[0]
+    Dec = test[1]
+    c = SkyCoord(ra=RA*u.degree, dec=Dec*u.degree, frame='icrs')
+    cg = c.galactic
+    tt = np.asarray(cg.l.rad)
+    pp = np.pi/2-np.asarray(cg.b.rad)
+
+    return tt, pp
 
 def project_halpha_data():
     
     halpha = get_halpha_data()
+    
+    tt, pp = get_galfa_interpolation_values()
+    
+    halpha_galfa = hp.pixelfunc.get_interp_val(halpha ,pp, tt, nest=True)
+    
+    return halpha_galfa
 
 
