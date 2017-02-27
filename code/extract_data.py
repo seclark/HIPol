@@ -220,4 +220,14 @@ def write_to_txt(hpindxs, allpQs, allpUs, allpQQs, allpUUs, allpangs):
     table = {'hpindx': hpindxs, 'psi_IAU': psi_IAU, 'galQ_IAU': allpQs, 'galU_IAU': -allpUs, 'galQQ': allpQQs, 'galUU': allpUUs}
 
     ascii.write(table, '../data/planck353_IAU.dat', formats={'hpindx': '%d'})
+
+def get_halpha_data():
+    halpha = hp.fitsfunc.read_map("../data/lambda_halpha_fwhm06_0512.fits")
     
+    return halpha
+
+def project_halpha_data():
+    
+    halpha = get_halpha_data()
+
+
