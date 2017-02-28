@@ -14,8 +14,13 @@ import sys
 from astropy import wcs
 import matplotlib
 matplotlib.rcParams.update({'figure.autolayout': True})
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 sys.path.insert(0, '../../PolarizationTools')
 import basic_functions as polarization_tools
+
+import sys 
+sys.path.insert(0, '../../FITSHandling/code')
+import cutouts
 
 
 def get_alldata():
@@ -222,12 +227,14 @@ def write_to_txt(hpindxs, allpQs, allpUs, allpQQs, allpUUs, allpangs):
     ascii.write(table, '../data/planck353_IAU.dat', formats={'hpindx': '%d'})
 
 def get_halpha_data():
-    halpha = hp.fitsfunc.read_map("../data/lambda_halpha_fwhm06_0512.fits")
+    halpha_fn = "../data/lambda_halpha_fwhm06_0512.fits"
+    halpha = hp.fitsfunc.read_map(halpha_fn)
+    halpha_hdr = fits.getheader(halpha_fn)
     
-    return halpha
+    return halpha, halpha_hdr
     
 def get_galfa_interpolation_values():
-    Gfile = '/Volumes/DataDavy/GALFA/DR2/FullSkyWide/GALFA_HI_W_S0900_V-090.9kms.fits'
+    Gfile = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_NHImap_SRcorr_VLSR-090+0090kms.fits'
     ghdu = fits.open(Gfile)
     gwcs = wcs.WCS(Gfile)
     xax = np.linspace(1,ghdu[0].header['NAXIS1'], ghdu[0].header['NAXIS1'] ).reshape(ghdu[0].header['NAXIS1'], 1)
@@ -244,12 +251,78 @@ def get_galfa_interpolation_values():
 
 def project_halpha_data():
     
-    halpha = get_halpha_data()
+    halpha, halpha_hdr = get_halpha_data()
     
     tt, pp = get_galfa_interpolation_values()
     
-    halpha_galfa = hp.pixelfunc.get_interp_val(halpha ,pp, tt, nest=True)
+    halpha_galfa = hp.pixelfunc.get_interp_val(halpha ,pp, tt, nest=False)
     
     return halpha_galfa
+
+def get_select_data():
+    # An intriguing area exists at [200:1600, 13000:15000] that's mapped in both GALFA and VTSS
+    
+    halpha_galfa = project_halpha_data()
+    halpha_galfa = halpha_galfa.T
+    
+    narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
+    narrownhi = fits.getdata(narrownhi_fn)
+    nhi_hdr = fits.getheader(narrownhi_fn)
+    
+    ystart = 200
+    ystop = 1600
+    xstart = 13000
+    xstop = 15000
+    
+    halpha_cutout_hdr, halpha_cutout = cutouts.xycutout_data(halpha_galfa, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
+    gnhi_cutout_hdr, gnhi_cutout = cutouts.xycutout_data(narrownhi, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
+    
+    fits.writeto('../data/Halpha_cutout_1.fits', halpha_cutout, halpha_cutout_hdr)
+    fits.writeto('../data/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut_cutout_1.fits', gnhi_cutout, gnhi_cutout_hdr)
+    
+    return halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout
+    
+def plot_select_data():
+    
+    #halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout = get_select_data()
+    
+    halpha_cutout_fn = '../data/Halpha_cutout_1.fits'
+    halpha_cutout = fits.getdata(halpha_cutout_fn)
+    halpha_cutout_hdr = fits.getheader(halpha_cutout_fn)
+    
+    gnhi_cutout_fn = '../data/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut_cutout_1.fits'
+    gnhi_cutout = fits.getdata(gnhi_cutout_fn)
+    
+    xax, ra_label = cutouts.get_xlabels_ra(halpha_cutout_hdr, skip = 200.0)
+    yax, dec_label = cutouts.get_ylabels_dec(halpha_cutout_hdr, skip = 100.0)
+    print(len(dec_label))
+
+    fig = plt.figure(figsize=(6, 4), facecolor = "white")
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+    im1 = ax1.imshow(np.clip(halpha_cutout, 0, 10))
+    im2 = ax2.imshow(np.clip(gnhi_cutout, 0, 0.8E21))
+    
+    allax = [ax1, ax2]
+    allim = [im1, im2]
+    allunits = ["R", r"cm$^{-2}$"]
+    for ax, im, unit in zip(allax, allim, allunits):
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        cax.set_ylabel(unit, rotation=360)
+    
+        ax.set_xticks(xax)
+        ax.set_xticklabels(np.round(ra_label))
+        ax.set_yticks(yax)
+        ax.set_yticklabels(np.round(dec_label))
+        ax.set_ylim(yax[0], yax[-1])
+        
+        ax.set_xlabel('RA')
+        ax.set_ylabel('DEC')
+
+    ax1.set_title(r'H-$\alpha$')
+    ax2.set_title('NHI vlsr -/+36 kms')
+    
 
 
