@@ -258,6 +258,36 @@ def project_halpha_data():
     halpha_galfa = hp.pixelfunc.get_interp_val(halpha ,pp, tt, nest=False)
     
     return halpha_galfa
+    
+def get_taurus_perseus():
+    # Perseus: ra, dec = 3.5486311    31.3358069
+    # Taurus: ra, dec = 4.5242677    26.7657750
+    
+    halpha_galfa = project_halpha_data()
+    halpha_galfa = halpha_galfa.T
+    
+    narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
+    narrownhi = fits.getdata(narrownhi_fn)
+    nhi_hdr = fits.getheader(narrownhi_fn)
+    
+    ystart = 1200
+    ystop = 2400
+    xstart = 20400
+    xstop = 21600
+    
+    # perseus x, y
+    #plt.plot(21387.560959878079, 1995.6449357101287, '+', color='pink')
+
+    # taurus x, y
+    #plt.plot(21329.022880954239, 1721.4435701128598, '+', color='red')
+    
+    halpha_cutout_hdr, halpha_cutout = cutouts.xycutout_data(halpha_galfa, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
+    gnhi_cutout_hdr, gnhi_cutout = cutouts.xycutout_data(narrownhi, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
+    
+    fits.writeto('../data/Halpha_cutout_taurus_perseus.fits', halpha_cutout, halpha_cutout_hdr)
+    fits.writeto('../data/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut_cutout_taurus_perseus.fits', gnhi_cutout, gnhi_cutout_hdr)
+    
+    halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout
 
 def get_select_data():
     # An intriguing area exists at [200:1600, 13000:15000] that's mapped in both GALFA and VTSS
