@@ -17,6 +17,7 @@ matplotlib.rcParams.update({'figure.autolayout': True})
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 sys.path.insert(0, '../../PolarizationTools')
 import basic_functions as polarization_tools
+#import seaborn as sns
 
 import sys 
 sys.path.insert(0, '../../FITSHandling/code')
@@ -259,6 +260,49 @@ def project_halpha_data():
     
     return halpha_galfa
     
+def plot_alltargets_halpha():
+    
+    #halpha_galfa = project_halpha_data()
+    #halpha_galfa = halpha_galfa.T
+    
+    halpha_galfa = fits.getdata('/Volumes/DataDavy/Halpha/Halpha_finkbeiner03_proj_on_DR2.fits')
+    
+    narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
+    narrownhi_hdr = fits.getheader(narrownhi_fn)
+    
+    xax, ra_label = cutouts.get_xlabels_ra(narrownhi_hdr, skip = 1000.0)
+    yax, dec_label = cutouts.get_ylabels_dec(narrownhi_hdr, skip = 500.0)
+    
+    fig = plt.figure(facecolor="white")
+    ax = fig.add_subplot(111)
+    im = ax.imshow(np.clip(halpha_galfa, 1, 8), cmap='Greys')
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    cax.set_ylabel('log (R)', rotation=360)
+    
+    alldata = get_alldata()
+    allnames = get_data_from_name(alldata, 'name')
+    #allcolors = sns.color_palette("spectral", len(alldata))
+    symbols = ['+']*10 + ['.']*10
+    for i, name in enumerate(allnames):
+        sourcex, sourcey = get_source_xy(name, narrownhi_fn)
+        ax.plot(sourcex, sourcey, symbols[i], ms=10, label=name)
+    
+    ax.legend(loc=3)
+    
+    ax.set_xticks(xax)
+    ax.set_xticklabels(np.round(ra_label))
+    ax.set_yticks(yax)
+    ax.set_yticklabels(np.round(dec_label))
+    ax.set_ylim(yax[0], yax[-1])
+
+    ax.set_xlim(19000, 21600)
+    
+    ax.set_xlabel('RA (J2000)')
+    ax.set_ylabel('DEC (J2000)')
+    
 def get_taurus_perseus():
     # Perseus: ra, dec = 3.5486311    31.3358069
     # Taurus: ra, dec = 4.5242677    26.7657750
@@ -287,7 +331,7 @@ def get_taurus_perseus():
     fits.writeto('../data/Halpha_cutout_taurus_perseus.fits', halpha_cutout, halpha_cutout_hdr)
     fits.writeto('../data/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut_cutout_taurus_perseus.fits', gnhi_cutout, gnhi_cutout_hdr)
     
-    halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout
+    return halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout
 
 def get_select_data():
     # An intriguing area exists at [200:1600, 13000:15000] that's mapped in both GALFA and VTSS
@@ -312,15 +356,46 @@ def get_select_data():
     
     return halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout
     
+def get_source_coordinates(sourcename, J2000=True):
+    alldata = get_alldata()
+    allnames = get_data_from_name(alldata, 'name')
+    allras = get_data_from_name(alldata, 'ra')
+    allras = [np.float(ra) for ra in allras]
+    alldecs = get_data_from_name(alldata, 'dec')
+    alldecs = [np.float(dec) for dec in alldecs]
+    
+    indx = allnames.index(sourcename)
+    
+    ra = allras[indx]
+    dec = alldecs[indx]
+    
+    if J2000 is True:
+        # convert ra, dec to J2000
+        c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, equinox='J1950.0')
+        c1 = c.transform_to(FK5(equinox='J2000.0'))
+        ra = c1.ra.value
+        dec = c1.dec.value
+    
+    return ra, dec
+
+def get_source_xy(sourcename, areafn):
+    sourcera, sourcedec = get_source_coordinates(sourcename)
+    w = make_wcs(areafn)
+    sourcex, sourcey = radec_to_xy(sourcera, sourcedec, w)
+    
+    return sourcex, sourcey
+    
 def plot_select_data():
     
     #halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout = get_select_data()
     
-    halpha_cutout_fn = '../data/Halpha_cutout_1.fits'
+    #halpha_cutout_fn = '../data/Halpha_cutout_1.fits'
+    halpha_cutout_fn = '../data/Halpha_cutout_taurus_perseus.fits'
     halpha_cutout = fits.getdata(halpha_cutout_fn)
     halpha_cutout_hdr = fits.getheader(halpha_cutout_fn)
     
-    gnhi_cutout_fn = '../data/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut_cutout_1.fits'
+    #gnhi_cutout_fn = '../data/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut_cutout_1.fits'
+    gnhi_cutout_fn = '../data/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut_cutout_taurus_perseus.fits'
     gnhi_cutout = fits.getdata(gnhi_cutout_fn)
     
     xax, ra_label = cutouts.get_xlabels_ra(halpha_cutout_hdr, skip = 200.0)
@@ -332,6 +407,11 @@ def plot_select_data():
     ax2 = fig.add_subplot(122)
     im1 = ax1.imshow(np.clip(halpha_cutout, 0, 10))
     im2 = ax2.imshow(np.clip(gnhi_cutout, 0, 0.8E21))
+    
+    overplotsource = "3C207"
+    sourcera, sourcedec = get_source_coordinates(overplotsource)
+    smallregw = make_wcs(halpha_cutout_fn)
+    sourcex, sourcey = radec_to_xy(sourcera, sourcedec, smallregw)
     
     allax = [ax1, ax2]
     allim = [im1, im2]
@@ -350,9 +430,33 @@ def plot_select_data():
         
         ax.set_xlabel('RA')
         ax.set_ylabel('DEC')
+        
+        ax.plot(sourcex, sourcey, '+', color='white', ms=20)
 
     ax1.set_title(r'H-$\alpha$')
     ax2.set_title('NHI vlsr -/+36 kms')
     
+def get_single_source_cutout(name = "3C207", save=True):
 
-
+    halpha_galfa = fits.getdata('/Volumes/DataDavy/Halpha/Halpha_finkbeiner03_proj_on_DR2.fits')
+    
+    narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
+    narrownhi = fits.getdata(narrownhi_fn)
+    nhi_hdr = fits.getheader(narrownhi_fn)
+    
+    sourcex, sourcey = get_source_xy(name, galfanhi_fn)
+    
+    # cutout dims
+    datar = 200
+    x0 = sourcex - datar
+    y0 = sourcey - datar
+    x1 = sourcex + datar
+    y1 = sourcey + datar
+    
+    halpha_cutout_hdr, halpha_cutout = cutouts.xycutout_data(halpha_galfa, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
+    gnhi_cutout_hdr, gnhi_cutout = cutouts.xycutout_data(narrownhi, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
+    
+    if save:
+        fits.writeto('../data/Halpha_cutout_'+name+'.fits', halpha_cutout, halpha_cutout_hdr)
+        fits.writeto('../data/GALFA_HI_cutout_'+name+'.fits', gnhi_cutout, gnhi_cutout_hdr)
+    
