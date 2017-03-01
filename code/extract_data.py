@@ -484,6 +484,37 @@ def make_all_single_source_cutouts():
     alldata = get_alldata()
     allnames = get_data_from_name(alldata, 'name')
     
+    # pop out the ones i've already made
+    allnames.pop(allnames.index('3C409'))
+    allnames.pop(allnames.index('3C207'))
+    print(allnames)
+    
+    for name in allnames:
+        halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, save=True, cutoutr=200)
+        
+def plot_HI_vs_Halpha_thumbnails():
+    
+    alldata = get_alldata()
+    allnames = get_data_from_name(alldata, 'name')
+    
+    nrows = 5
+    ncols = 4
+    fig = plt.figure(figsize=(10, 8), facecolor="white")
+    
+    for i, name in enumerate(allnames):
+        halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, save=False, cutoutr=200)
+        chunkfn = '../data/GALFA_HI_cutout_'+name+'.fits'
+        chunkhdr = fits.getheader(chunkfn)
+        sourcex, sourcey = get_source_xy(name, chunkfn)
+        
+        gnhi_data = np.array((gnhi_cutout/1.0E20).flatten())
+        halpha_data = np.array(halpha_cutout.flatten())
+        
+        ax = fig.add_subplot(nrows, ncols, i+1)
+        ax.scatter(gnhi_data, halpha_data, color='black', alpha=0.5, s=1)
+        
+        ax.set_title(name)
+    
 def plot_single_source_cutout(name = "3C409"):
     
     halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, cutoutr = 150, save=False)
