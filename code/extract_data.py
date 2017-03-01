@@ -150,6 +150,9 @@ def plot_thumbnails():
         
         ax.quiver(datar, datar, np.cos(np.radians(allpangs[i])), np.sin(np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")#, scale=(np.max(allppwr)-allppwr[i]))
 
+
+
+
 def get_Planck_data(fn = None, Nside = 2048):
     """
     Get TQU and covariance matrix data.
@@ -385,6 +388,18 @@ def get_source_xy(sourcename, areafn):
     
     return sourcex, sourcey
     
+def get_source_pang(sourcename):
+
+    alldata = get_alldata()
+    allnames = get_data_from_name(alldata, 'name')
+    allpangs = get_data_from_name(alldata, 'pang')
+    allpangs = [np.float(pang) for pang in allpangs]
+    
+    indx = allnames.index(sourcename)
+    pang = allpangs[indx]
+    
+    return pang
+    
 def plot_select_data():
     
     #halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout = get_select_data()
@@ -436,22 +451,25 @@ def plot_select_data():
     ax1.set_title(r'H-$\alpha$')
     ax2.set_title('NHI vlsr -/+36 kms')
     
-def get_single_source_cutout(name = "3C207", save=True):
+def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200):
 
     halpha_galfa = fits.getdata('/Volumes/DataDavy/Halpha/Halpha_finkbeiner03_proj_on_DR2.fits')
     
-    narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
+    #narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
+    narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_NHImap_SRcorr_VDEV-060+0060kms.fits'
+    
     narrownhi = fits.getdata(narrownhi_fn)
     nhi_hdr = fits.getheader(narrownhi_fn)
     
-    sourcex, sourcey = get_source_xy(name, galfanhi_fn)
+    sourcex, sourcey = get_source_xy(name, narrownhi_fn)
     
     # cutout dims
-    datar = 200
-    x0 = sourcex - datar
-    y0 = sourcey - datar
-    x1 = sourcex + datar
-    y1 = sourcey + datar
+    xstart = np.int(sourcex - cutoutr)
+    ystart = np.int(sourcey - cutoutr)
+    xstop = np.int(sourcex + cutoutr)
+    ystop = np.int(sourcey + cutoutr)
+    
+    print(xstart, ystart, xstop, ystop)
     
     halpha_cutout_hdr, halpha_cutout = cutouts.xycutout_data(halpha_galfa, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
     gnhi_cutout_hdr, gnhi_cutout = cutouts.xycutout_data(narrownhi, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
@@ -459,4 +477,53 @@ def get_single_source_cutout(name = "3C207", save=True):
     if save:
         fits.writeto('../data/Halpha_cutout_'+name+'.fits', halpha_cutout, halpha_cutout_hdr)
         fits.writeto('../data/GALFA_HI_cutout_'+name+'.fits', gnhi_cutout, gnhi_cutout_hdr)
+        
+    return halpha_cutout, gnhi_cutout
+    
+def make_all_single_source_cutouts():
+    alldata = get_alldata()
+    allnames = get_data_from_name(alldata, 'name')
+    
+def plot_single_source_cutout(name = "3C409"):
+    
+    halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, cutoutr = 150, save=False)
+    ny, nx = gnhi_cutout.shape
+    
+    chunkfn = '../data/GALFA_HI_cutout_'+name+'.fits'
+    chunkhdr = fits.getheader(chunkfn)
+    sourcex, sourcey = get_source_xy(name, chunkfn)
+    
+    fig = plt.figure(facecolor='white')
+    ax = fig.add_subplot(111)
+    ax.set_ylim(0, ny)
+    
+    #im = ax.imshow(gnhi_cutout, cmap='Greys')
+    im = ax.imshow(halpha_cutout, cmap='Greys')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    #cax.set_ylabel(r'NHI', rotation=360, labelpad=20)
+    cax.set_ylabel(r'H-$\alpha$ (R)', rotation=360, labelpad=20)
+    
+    pang = get_source_pang(name)
+    #ax.plot(sourcex, sourcey, '+', color='red', zorder=10)
+    pang += 90 # adjust for quiver coordinate system
+    ax.quiver(sourcex, sourcey, np.cos(np.radians(pang)), np.sin(np.radians(pang)), headaxislength=0, headlength=0, pivot='mid', color="red", zorder=10)
+    
+    #cs = ax.contour(halpha_cutout)#, levels=[0.2, 0.4, 0.6, 0.8, 1.0, 1.2])
+    cs = ax.contour(gnhi_cutout) 
+    print(cs.levels)
+    
+    ax.set_title(name)
+    
+    xax, ra_label = cutouts.get_xlabels_ra(chunkhdr, skip = 100.0)
+    yax, dec_label = cutouts.get_ylabels_dec(chunkhdr, skip = 50.0)
+    
+    ax.set_xticks(xax)
+    ax.set_xticklabels(np.round(ra_label))
+    ax.set_yticks(yax)
+    ax.set_yticklabels(np.round(dec_label))
+    ax.set_xlabel('RA (J2000)')
+    ax.set_ylabel('DEC (J2000)')
+
     
