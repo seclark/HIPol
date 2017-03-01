@@ -374,10 +374,10 @@ def get_source_coordinates(sourcename, J2000=True):
     
     if J2000 is True:
         # convert ra, dec to J2000
-        c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, equinox='J1950.0')
+        c = SkyCoord(ra=ra*u.hourangle, dec=dec*u.degree, equinox='J1950.0')
         c1 = c.transform_to(FK5(equinox='J2000.0'))
-        ra = c1.ra.value
-        dec = c1.dec.value
+        ra = c1.ra.degree
+        dec = c1.dec.degree 
     
     return ra, dec
 
@@ -451,7 +451,7 @@ def plot_select_data():
     ax1.set_title(r'H-$\alpha$')
     ax2.set_title('NHI vlsr -/+36 kms')
     
-def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200):
+def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200, returnhdrs=False):
 
     halpha_galfa = fits.getdata('/Volumes/DataDavy/Halpha/Halpha_finkbeiner03_proj_on_DR2.fits')
     
@@ -477,8 +477,12 @@ def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200):
     if save:
         fits.writeto('../data/Halpha_cutout_'+name+'.fits', halpha_cutout, halpha_cutout_hdr)
         fits.writeto('../data/GALFA_HI_cutout_'+name+'.fits', gnhi_cutout, gnhi_cutout_hdr)
-        
-    return halpha_cutout, gnhi_cutout
+    
+    if returnhdrs:
+        return halpha_cutout, gnhi_cutout, halpha_cutout_hdr, gnhi_cutout_hdr
+     
+    else:
+        return halpha_cutout, gnhi_cutout
     
 def make_all_single_source_cutouts():
     alldata = get_alldata()
@@ -502,16 +506,19 @@ def plot_HI_vs_Halpha_thumbnails():
     fig = plt.figure(figsize=(10, 8), facecolor="white")
     
     for i, name in enumerate(allnames):
-        halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, save=False, cutoutr=200)
-        chunkfn = '../data/GALFA_HI_cutout_'+name+'.fits'
-        chunkhdr = fits.getheader(chunkfn)
-        sourcex, sourcey = get_source_xy(name, chunkfn)
+        #halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, save=False, cutoutr=200)
+        #chunkfn = '../data/GALFA_HI_cutout_'+name+'.fits'
+        #chunkhdr = fits.getheader(chunkfn)
+        #sourcex, sourcey = get_source_xy(name, chunkfn)
+        halpha_cutout, gnhi_cutout, halpha_cutout_hdr, gnhi_cutout_hdr = get_single_source_cutout(name=name, save=False, cutoutr=200, returnhdrs=True)
+        
+        sourcex, sourcey = get_source_xy(name, halpha_cutout_hdr)
         
         gnhi_data = np.array((gnhi_cutout/1.0E20).flatten())
         halpha_data = np.array(halpha_cutout.flatten())
         
         ax = fig.add_subplot(nrows, ncols, i+1)
-        ax.scatter(gnhi_data, halpha_data, color='black', alpha=0.5, s=1)
+        ax.scatter(gnhi_data, halpha_data, color='black', alpha=0.1, s=1)
         
         ax.set_title(name)
     
