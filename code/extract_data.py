@@ -111,7 +111,7 @@ def plot_thumbnails():
     
     nrows = 5
     ncols = 4
-    fig = plt.figure(figsize=(12, 10), facecolor="white")
+    fig = plt.figure(figsize=(10, 8), facecolor="white")
     datar = 200
     
     for i, (ra, dec) in enumerate(zip(allras, alldecs)):
@@ -119,24 +119,26 @@ def plot_thumbnails():
         w = make_wcs(nhidata_fn)
         
         # convert ra, dec to J2000
-        c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, equinox='J1950.0')
-        c1 = c.transform_to(FK5(equinox='J2000.0'))
-        ra = c1.ra.value
-        dec = c1.dec.value
+        #c = SkyCoord(ra=ra*u.hourangle, dec=dec*u.degree, equinox='J1950.0')
+        #c1 = c.transform_to(FK5(equinox='J2000.0'))
+        #ra = c1.ra.value
+        #dec = c1.dec.value
+        
+        ra, dec = get_source_coordinates(allnames[i])
         
         x_center, y_center = radec_to_xy(ra, dec, w)
         
-        x0 = x_center - datar
-        y0 = y_center - datar
-        x1 = x_center + datar
-        y1 = y_center + datar
+        x0 = np.int(np.round(x_center - datar))
+        y0 = np.int(np.round(y_center - datar))
+        x1 = np.int(np.round(x_center + datar))
+        y1 = np.int(np.round(y_center + datar))
         
         rastart, decstart = xy_to_radec(x0, y0, w)
         raend, decend = xy_to_radec(x1, y1, w)
         
         ax = fig.add_subplot(nrows, ncols, i+1)
-        #ax.imshow(intrht[y0:y1, x0:x1], cmap='Greys')#, extent=[rastart, raend, decstart, decend])
-        ax.imshow(nhidata[y0:y1, x0:x1], cmap='Greys')
+        ax.imshow(intrht[y0:y1, x0:x1], cmap='Greys')#, extent=[rastart, raend, decstart, decend])
+        #ax.imshow(nhidata[y0:y1, x0:x1], cmap='Greys')
         ax.set_title(allnames[i])
         ax.set_ylim(0, y1-y0)
         
@@ -148,7 +150,8 @@ def plot_thumbnails():
         #print(labels)
         #ax.set_xticklabels(labels)
         
-        ax.quiver(datar, datar, np.cos(np.radians(allpangs[i])), np.sin(np.radians(allpangs[i])), headaxislength=0, headlength=0, pivot='mid', color="red")#, scale=(np.max(allppwr)-allppwr[i]))
+        pang = allpangs[i] + 90 # adjust for quiver coordinate system
+        ax.quiver(datar, datar, np.cos(np.radians(pang)), np.sin(np.radians(pang)), headaxislength=0, headlength=0, pivot='mid', color="red")#, scale=(np.max(allppwr)-allppwr[i]))
 
 
 
@@ -283,7 +286,7 @@ def plot_alltargets_halpha():
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
-    cax.set_ylabel('log (R)', rotation=360)
+    cax.set_ylabel(r'H-$\alpha$ (R)', rotation=360)
     
     alldata = get_alldata()
     allnames = get_data_from_name(alldata, 'name')
@@ -291,9 +294,10 @@ def plot_alltargets_halpha():
     symbols = ['+']*10 + ['.']*10
     for i, name in enumerate(allnames):
         sourcex, sourcey = get_source_xy(name, narrownhi_fn)
-        ax.plot(sourcex, sourcey, symbols[i], ms=10, label=name)
+        ax.plot(sourcex, sourcey, symbols[i], ms=5, label=name)
     
-    ax.legend(loc=3)
+    ax.legend(loc=3, bbox_to_anchor=(0., 1.02, 1., .102), 
+       ncol=2, mode="expand", borderaxespad=0.)
     
     ax.set_xticks(xax)
     ax.set_xticklabels(np.round(ra_label))
@@ -301,7 +305,7 @@ def plot_alltargets_halpha():
     ax.set_yticklabels(np.round(dec_label))
     ax.set_ylim(yax[0], yax[-1])
 
-    ax.set_xlim(19000, 21600)
+    #ax.set_xlim(19000, 21600)
     
     ax.set_xlabel('RA (J2000)')
     ax.set_ylabel('DEC (J2000)')
@@ -359,7 +363,7 @@ def get_select_data():
     
     return halpha_cutout_hdr, halpha_cutout, gnhi_cutout_hdr, gnhi_cutout
     
-def get_source_coordinates(sourcename, J2000=True):
+def get_source_coordinates_old(sourcename, J2000=True):
     alldata = get_alldata()
     allnames = get_data_from_name(alldata, 'name')
     allras = get_data_from_name(alldata, 'ra')
@@ -380,6 +384,24 @@ def get_source_coordinates(sourcename, J2000=True):
         dec = c1.dec.degree 
     
     return ra, dec
+
+def get_source_coordinates(sourcename):
+    alldata = get_alldata()
+    allnames = get_data_from_name(alldata, 'name')
+    allells = get_data_from_name(alldata, 'ell')
+    allells = [np.float(ell) for ell in allells]
+    allbees = get_data_from_name(alldata, 'bee')
+    allbees = [np.float(bee) for bee in allbees]
+    
+    indx = allnames.index(sourcename)
+    
+    ell = allells[indx]
+    bee = allbees[indx]
+    
+    c = SkyCoord("galactic", l=ell*u.degree, b=bee*u.degree)
+    c_icrs = c.icrs
+    
+    return c_icrs.ra.degree, c_icrs.dec.degree
 
 def get_source_xy(sourcename, areafn):
     sourcera, sourcedec = get_source_coordinates(sourcename)
@@ -464,10 +486,10 @@ def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200, returnhd
     sourcex, sourcey = get_source_xy(name, narrownhi_fn)
     
     # cutout dims
-    xstart = np.int(sourcex - cutoutr)
-    ystart = np.int(sourcey - cutoutr)
-    xstop = np.int(sourcex + cutoutr)
-    ystop = np.int(sourcey + cutoutr)
+    xstart = np.int(np.round(sourcex - cutoutr))
+    ystart = np.int(np.round(sourcey - cutoutr))
+    xstop = np.int(np.round(sourcex + cutoutr))
+    ystop = np.int(np.round(sourcey + cutoutr))
     
     print(xstart, ystart, xstop, ystop)
     
@@ -475,8 +497,8 @@ def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200, returnhd
     gnhi_cutout_hdr, gnhi_cutout = cutouts.xycutout_data(narrownhi, nhi_hdr, xstart = xstart, xstop = xstop, ystart = ystart, ystop = ystop)
     
     if save:
-        fits.writeto('../data/Halpha_cutout_'+name+'.fits', halpha_cutout, halpha_cutout_hdr)
-        fits.writeto('../data/GALFA_HI_cutout_'+name+'.fits', gnhi_cutout, gnhi_cutout_hdr)
+        fits.writeto('../data/cutouts/Halpha_cutout_'+name+'.fits', halpha_cutout, halpha_cutout_hdr)
+        fits.writeto('../data/cutouts/GALFA_HI_cutout_'+name+'.fits', gnhi_cutout, gnhi_cutout_hdr)
     
     if returnhdrs:
         return halpha_cutout, gnhi_cutout, halpha_cutout_hdr, gnhi_cutout_hdr
@@ -489,8 +511,8 @@ def make_all_single_source_cutouts():
     allnames = get_data_from_name(alldata, 'name')
     
     # pop out the ones i've already made
-    allnames.pop(allnames.index('3C409'))
-    allnames.pop(allnames.index('3C207'))
+    #allnames.pop(allnames.index('3C409'))
+    #allnames.pop(allnames.index('3C207'))
     print(allnames)
     
     for name in allnames:
@@ -522,12 +544,17 @@ def plot_HI_vs_Halpha_thumbnails():
         
         ax.set_title(name)
     
-def plot_single_source_cutout(name = "3C409"):
+def plot_single_source_cutout(name = "3C409", contour='nhi'):
     
-    halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, cutoutr = 150, save=False)
+    #halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, cutoutr = 200, save=True)
+    chunkfn = '../data/GALFA_HI_cutout_'+name+'.fits'
+    gnhi_cutout = fits.getdata(chunkfn)
+    
+    HAchunkfn = '../data/Halpha_cutout_'+name+'.fits'
+    halpha_cutout = fits.getdata(HAchunkfn)
+    
     ny, nx = gnhi_cutout.shape
     
-    chunkfn = '../data/GALFA_HI_cutout_'+name+'.fits'
     chunkhdr = fits.getheader(chunkfn)
     sourcex, sourcey = get_source_xy(name, chunkfn)
     
@@ -535,22 +562,31 @@ def plot_single_source_cutout(name = "3C409"):
     ax = fig.add_subplot(111)
     ax.set_ylim(0, ny)
     
-    #im = ax.imshow(gnhi_cutout, cmap='Greys')
-    im = ax.imshow(halpha_cutout, cmap='Greys')
+    if contour is 'nhi':
+        im = ax.imshow(halpha_cutout, cmap='Greys')
+    else:
+        im = ax.imshow(gnhi_cutout, cmap='Greys')
+        
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
-    #cax.set_ylabel(r'NHI', rotation=360, labelpad=20)
-    cax.set_ylabel(r'H-$\alpha$ (R)', rotation=360, labelpad=20)
+    
+    if contour is 'nhi':
+        cax.set_ylabel(r'H-$\alpha$ (R)', rotation=360, labelpad=20)
+    else:
+        cax.set_ylabel(r'NHI', rotation=360, labelpad=20)
     
     pang = get_source_pang(name)
     #ax.plot(sourcex, sourcey, '+', color='red', zorder=10)
     pang += 90 # adjust for quiver coordinate system
     ax.quiver(sourcex, sourcey, np.cos(np.radians(pang)), np.sin(np.radians(pang)), headaxislength=0, headlength=0, pivot='mid', color="red", zorder=10)
     
-    #cs = ax.contour(halpha_cutout)#, levels=[0.2, 0.4, 0.6, 0.8, 1.0, 1.2])
-    cs = ax.contour(gnhi_cutout) 
-    print(cs.levels)
+    if contour is 'nhi':
+        cs = ax.contour(gnhi_cutout) 
+    elif contour is 'halpha':
+        cs = ax.contour(halpha_cutout)#, levels=[0.2, 0.4, 0.6, 0.8, 1.0, 1.2])
+
+    #print(cs.levels)
     
     ax.set_title(name)
     
