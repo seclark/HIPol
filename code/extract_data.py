@@ -477,8 +477,9 @@ def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200, returnhd
 
     halpha_galfa = fits.getdata('/Volumes/DataDavy/Halpha/Halpha_finkbeiner03_proj_on_DR2.fits')
     
-    narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
+    #narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_VLSR-036+0037kms_NHImap_noTcut.fits'
     #narrownhi_fn = '/Volumes/DataDavy/GALFA/DR2/NHIMaps/GALFA-HI_NHImap_SRcorr_VDEV-060+0060kms.fits'
+    narrownhi_fn = "/Volumes/DataDavy/GALFA/DR2/FullSkyRHT/new_thetarht_maps/intrht_coadd_974_1069.fits"
     
     narrownhi = fits.getdata(narrownhi_fn)
     nhi_hdr = fits.getheader(narrownhi_fn)
@@ -499,6 +500,7 @@ def get_single_source_cutout(name = "3C207", save=False, cutoutr = 200, returnhd
     if save:
         fits.writeto('../data/cutouts/Halpha_cutout_'+name+'.fits', halpha_cutout, halpha_cutout_hdr)
         fits.writeto('../data/cutouts/GALFA_HI_narrow_cutout_'+name+'.fits', gnhi_cutout, gnhi_cutout_hdr)
+        #fits.writeto('../data/cutouts/RHT_cutout_'+name+'.fits', gnhi_cutout, gnhi_cutout_hdr)
     
     if returnhdrs:
         return halpha_cutout, gnhi_cutout, halpha_cutout_hdr, gnhi_cutout_hdr
@@ -570,11 +572,15 @@ def plot_HI_vs_Halpha_thumbnails():
         
         ax.set_title(name)
     
-def plot_single_source_cutout(name = "3C409", contour='nhi', nonegnhi=True):
+def plot_single_source_cutout(name = "3C409", contour='nhi', nonegnhi=True, norm=False):
     
     #halpha_cutout, gnhi_cutout = get_single_source_cutout(name=name, cutoutr = 200, save=True)
-    chunkfn = '../data/cutouts/GALFA_HI_narrow_cutout_'+name+'.fits'
+    #chunkfn = '../data/cutouts/GALFA_HI_narrow_cutout_'+name+'.fits'
+    chunkfn = '../data/cutouts/RHT_cutout_'+name+'.fits'
     gnhi_cutout = fits.getdata(chunkfn)
+    
+    if norm:
+        gnhi_cutout = gnhi_cutout/np.nanmax(gnhi_cutout)
     
     HAchunkfn = '../data/cutouts/Halpha_cutout_'+name+'.fits'
     halpha_cutout = fits.getdata(HAchunkfn)
@@ -603,7 +609,8 @@ def plot_single_source_cutout(name = "3C409", contour='nhi', nonegnhi=True):
     if contour is 'nhi':
         cax.set_ylabel(r'H-$\alpha$ (R)', rotation=360, labelpad=20)
     else:
-        cax.set_ylabel(r'NHI', rotation=360, labelpad=20)
+        #cax.set_ylabel(r'NHI', rotation=360, labelpad=20)
+        cax.set_ylabel(r'Relative HI Linear Intensity', rotation=270, labelpad=20)
     
     pang = get_source_pang(name)
     #ax.plot(sourcex, sourcey, '+', color='red', zorder=10)
